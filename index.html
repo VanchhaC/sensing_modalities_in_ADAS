@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Driver Monitoring Sensor Study Explorer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0f1117;
+      --bg2:       #171b26;
+      --bg3:       #1e2330;
+      --border:    rgba(255,255,255,0.08);
+      --border2:   rgba(255,255,255,0.16);
+      --text:      #e8eaf0;
+      --text2:     #8b90a0;
+      --text3:     #555b70;
+      --radius:    8px;
+      --font:      'DM Sans', sans-serif;
+      --mono:      'DM Mono', monospace;
+
+      --rgb:       #E34234;
+      --fir:       #F08030;
+      --nir:       #D97820;
+      --depth:     #B06820;
+      --audio:     #3A86FF;
+      --ecg:       #9B5DE5;
+      --eeg:       #06D6A0;
+      --eye:       #FFB703;
+      --eda:       #FB5607;
+      --vehicle:   #8338EC;
+
+      --drowsy:    #2196F3;
+      --distract:  #FF5722;
+      --emotion:   #CE93D8;
+      --intent:    #4CAF50;
+    }
+
+    html, body {
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 16px 60px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 36px;
+      max-width: 640px;
+    }
+
+    header h1 {
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: -0.3px;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+
+    header p {
+      font-size: 13px;
+      color: var(--text2);
+      line-height: 1.6;
+    }
+
+    .card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px 24px 32px;
+      width: 100%;
+      max-width: 860px;
+    }
+
+    .section-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--text3);
+      margin-bottom: 10px;
+      padding-left: 2px;
+    }
+
+    .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      justify-content: center;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 13px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1.5px solid var(--border2);
+      background: var(--bg3);
+      color: var(--text2);
+      transition: all 0.15s ease;
+      user-select: none;
+      white-space: nowrap;
+    }
+    .chip:hover { border-color: rgba(255,255,255,0.3); color: var(--text); }
+
+    .chip.active {
+      border-width: 2px;
+      font-weight: 600;
+    }
+    .chip.dimmed { opacity: 0.18; pointer-events: none; }
+
+    .study-chip {
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 500;
+      padding: 7px 12px;
+      border-radius: 7px;
+      letter-spacing: 0.3px;
+    }
+
+    .target-chip {
+      font-size: 12px;
+      padding: 7px 16px;
+      border-radius: 20px;
+      font-weight: 500;
+    }
+
+    /* Arrow canvas zone */
+    .arrow-zone {
+      position: relative;
+      height: 48px;
+      margin: 6px 0;
+      width: 100%;
+    }
+    .arrow-zone svg {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      overflow: visible;
+      pointer-events: none;
+    }
+
+    /* divider */
+    .divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 24px 0;
+    }
+
+    /* Legend */
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 20px;
+      justify-content: center;
+      margin-top: 28px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--text2);
+      font-family: var(--mono);
+    }
+    .legend-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* Info panel */
+    .info-panel {
+      margin-top: 20px;
+      min-height: 56px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 18px;
+      font-size: 12px;
+      color: var(--text2);
+      line-height: 1.7;
+      transition: opacity 0.2s;
+    }
+    .info-panel .info-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+    .info-panel .tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-family: var(--mono);
+      margin: 2px 3px 2px 0;
+      font-weight: 500;
+    }
+
+    /* Reset */
+    .reset-btn {
+      margin-top: 20px;
+      padding: 8px 22px;
+      border-radius: 20px;
+      border: 1px solid var(--border2);
+      background: transparent;
+      color: var(--text2);
+      font-size: 12px;
+      font-family: var(--font);
+      cursor: pointer;
+      transition: all 0.15s;
+      display: block;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .reset-btn:hover { border-color: rgba(255,255,255,0.3); color: var(--text); }
+
+    .hint {
+      font-size: 11.5px;
+      color: var(--text3);
+      text-align: center;
+      margin-bottom: 20px;
+      font-family: var(--mono);
+      letter-spacing: 0.2px;
+    }
+
+    @media (max-width: 600px) {
+      .card { padding: 20px 14px 24px; }
+      header h1 { font-size: 18px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Driver Monitoring Sensor Study Explorer</h1>
+  <p>Interactive map of sensors, studies, and target states in driver monitoring research.<br>Click any element to highlight its connections.</p>
+</header>
+
+<div class="card">
+  <p class="hint">↑ sensors &nbsp;·&nbsp; [study IDs] &nbsp;·&nbsp; target states ↓ &nbsp;·&nbsp; click to explore</p>
+
+  <div class="section-label">Sensing Modalities</div>
+  <div class="chip-row" id="sensor-row"></div>
+
+  <div class="arrow-zone"><svg id="svg-top"></svg></div>
+
+  <div class="section-label">Studies</div>
+  <div class="chip-row" id="study-row"></div>
+
+  <div class="arrow-zone"><svg id="svg-bot"></svg></div>
+
+  <div class="section-label">Target States</div>
+  <div class="chip-row" id="target-row"></div>
+
+  <div class="info-panel" id="info-panel">
+    <span style="color:var(--text3);font-family:var(--mono);font-size:11px;">Select any element to see details</span>
+  </div>
+
+  <button class="reset-btn" onclick="resetAll()">↺ Reset</button>
+
+  <hr class="divider">
+
+  <div class="legend" id="legend"></div>
+</div>
+
+<script>
+const SENSOR_COLORS = {
+  RGB:            '#E34234',
+  FIR:            '#F08030',
+  NIR:            '#D97820',
+  Depth:          '#B06820',
+  Audio:          '#3A86FF',
+  ECG:            '#9B5DE5',
+  EEG:            '#06D6A0',
+  'Eye tracking': '#FFB703',
+  EDA:            '#FB5607',
+  Vehicle:        '#8338EC',
+};
+
+const TARGET_COLORS = {
+  Drowsiness:          '#2196F3',
+  Distraction:         '#FF5722',
+  Emotion:             '#CE93D8',
+  'Intention/Command': '#4CAF50',
+};
+
+const SENSOR_FULL = {
+  RGB: 'Red-Green-Blue camera',
+  FIR: 'Far Infrared camera',
+  NIR: 'Near Infrared camera',
+  Depth: 'Depth / 3D camera',
+  Audio: 'Audio / microphone',
+  ECG: 'Electrocardiogram',
+  EEG: 'Electroencephalogram',
+  'Eye tracking': 'Eye tracking / gaze',
+  EDA: 'Electrodermal Activity',
+  Vehicle: 'Vehicle Telemetry',
+};
+
+const STUDIES = [
+  { id:7,  sensors:['RGB'],                                        targets:['Emotion'] },
+  { id:24, sensors:['FIR'],                                        targets:['Drowsiness'] },
+  { id:27, sensors:['NIR','RGB'],                                  targets:['Emotion'] },
+  { id:33, sensors:['RGB','Depth'],                                targets:['Distraction'] },
+  { id:34, sensors:['RGB'],                                        targets:['Distraction'] },
+  { id:22, sensors:['RGB'],                                        targets:['Distraction','Drowsiness'] },
+  { id:26, sensors:['RGB','NIR'],                                  targets:['Distraction','Emotion','Drowsiness'] },
+  { id:25, sensors:['RGB','EEG','Audio','ECG'],                    targets:['Emotion','Drowsiness'] },
+  { id:31, sensors:['Audio','RGB'],                                targets:['Emotion'] },
+  { id:18, sensors:['Audio','Vehicle'],                            targets:['Intention/Command'] },
+  { id:37, sensors:['EEG','Audio','Vehicle'],                      targets:['Drowsiness'] },
+  { id:38, sensors:['Audio','Vehicle'],                            targets:['Intention/Command'] },
+  { id:39, sensors:['Audio'],                                      targets:['Intention/Command'] },
+  { id:40, sensors:['EEG','Eye tracking','ECG','EDA'],             targets:['Emotion'] },
+  { id:20, sensors:['Audio','ECG','Eye tracking','RGB','Vehicle'], targets:['Emotion'] },
+  { id:41, sensors:['Audio','Eye tracking','ECG','EDA'],           targets:['Emotion'] },
+  { id:32, sensors:['Vehicle','EDA','ECG','Eye tracking','RGB'],   targets:['Intention/Command'] },
+  { id:42, sensors:['RGB'],                                        targets:['Emotion','Distraction'] },
+  { id:8,  sensors:['RGB'],                                        targets:['Distraction','Drowsiness'] },
+  { id:43, sensors:['Eye tracking','Audio'],                       targets:['Distraction'] },
+  { id:17, sensors:['Audio','Vehicle'],                            targets:['Intention/Command'] },
+];
+
+const SENSORS = Object.keys(SENSOR_COLORS);
+const TARGETS = Object.keys(TARGET_COLORS);
+
+let selected = null;
+
+function getRelated(type, id) {
+  let studyIds = new Set(), sensorIds = new Set(), targetIds = new Set();
+  if (type === 'study') {
+    const s = STUDIES.find(x => x.id === id);
+    if (s) {
+      studyIds.add(id);
+      s.sensors.forEach(x => sensorIds.add(x));
+      s.targets.forEach(x => targetIds.add(x));
+    }
+  } else if (type === 'sensor') {
+    sensorIds.add(id);
+    STUDIES.forEach(s => {
+      if (s.sensors.includes(id)) {
+        studyIds.add(s.id);
+        s.targets.forEach(x => targetIds.add(x));
+      }
+    });
+  } else if (type === 'target') {
+    targetIds.add(id);
+    STUDIES.forEach(s => {
+      if (s.targets.includes(id)) {
+        studyIds.add(s.id);
+        s.sensors.forEach(x => sensorIds.add(x));
+      }
+    });
+  }
+  return { studyIds, sensorIds, targetIds };
+}
+
+function updateInfoPanel(type, id, related) {
+  const panel = document.getElementById('info-panel');
+  if (!selected) {
+    panel.innerHTML = '<span style="color:var(--text3);font-family:var(--mono);font-size:11px;">Select any element to see details</span>';
+    return;
+  }
+
+  let html = '';
+  if (type === 'sensor') {
+    const c = SENSOR_COLORS[id];
+    html = `<div class="info-title" style="color:${c}">${id} — ${SENSOR_FULL[id] || ''}</div>`;
+    html += `Used in <strong>${related.studyIds.size}</strong> studies &nbsp;·&nbsp; `;
+    html += `Linked to: `;
+    [...related.targetIds].forEach(t => {
+      html += `<span class="tag" style="background:${TARGET_COLORS[t]}22;color:${TARGET_COLORS[t]};border:1px solid ${TARGET_COLORS[t]}44">${t}</span>`;
+    });
+    html += `<br><span style="color:var(--text3);font-size:11px;font-family:var(--mono)">Studies: ${[...related.studyIds].sort((a,b)=>a-b).map(x=>'['+x+']').join(' ')}</span>`;
+  } else if (type === 'study') {
+    const s = STUDIES.find(x => x.id === id);
+    const c = SENSOR_COLORS[s.sensors[0]];
+    html = `<div class="info-title" style="color:${c}">Study [${id}]</div>`;
+    html += `Sensors: `;
+    s.sensors.forEach(sen => {
+      html += `<span class="tag" style="background:${SENSOR_COLORS[sen]}22;color:${SENSOR_COLORS[sen]};border:1px solid ${SENSOR_COLORS[sen]}44">${sen}</span>`;
+    });
+    html += `<br>Targets: `;
+    s.targets.forEach(t => {
+      html += `<span class="tag" style="background:${TARGET_COLORS[t]}22;color:${TARGET_COLORS[t]};border:1px solid ${TARGET_COLORS[t]}44">${t}</span>`;
+    });
+  } else if (type === 'target') {
+    const c = TARGET_COLORS[id];
+    html = `<div class="info-title" style="color:${c}">${id}</div>`;
+    html += `Detected in <strong>${related.studyIds.size}</strong> studies &nbsp;·&nbsp; `;
+    html += `Using: `;
+    [...related.sensorIds].forEach(s => {
+      html += `<span class="tag" style="background:${SENSOR_COLORS[s]}22;color:${SENSOR_COLORS[s]};border:1px solid ${SENSOR_COLORS[s]}44">${s}</span>`;
+    });
+    html += `<br><span style="color:var(--text3);font-size:11px;font-family:var(--mono)">Studies: ${[...related.studyIds].sort((a,b)=>a-b).map(x=>'['+x+']').join(' ')}</span>`;
+  }
+  panel.innerHTML = html;
+}
+
+function render() {
+  const related = selected ? getRelated(selected.type, selected.id) : null;
+
+  // SENSORS
+  const sRow = document.getElementById('sensor-row');
+  sRow.innerHTML = '';
+  SENSORS.forEach(s => {
+    const el = document.createElement('div');
+    el.className = 'chip';
+    el.textContent = s;
+    const c = SENSOR_COLORS[s];
+    const isActive = related && related.sensorIds.has(s);
+    const isDimmed = related && !related.sensorIds.has(s);
+    if (isActive) {
+      el.style.background = c + '22';
+      el.style.borderColor = c;
+      el.style.color = c;
+      el.classList.add('active');
+    } else if (!related) {
+      el.style.borderColor = c + '55';
+      el.style.color = c + 'bb';
+    } else {
+      el.classList.add('dimmed');
+    }
+    el.onclick = () => toggle('sensor', s);
+    sRow.appendChild(el);
+  });
+
+  // STUDIES
+  const stRow = document.getElementById('study-row');
+  stRow.innerHTML = '';
+  STUDIES.forEach(s => {
+    const el = document.createElement('div');
+    el.className = 'chip study-chip';
+    el.textContent = '[' + s.id + ']';
+    const c = SENSOR_COLORS[s.sensors[0]] || '#888';
+    const isActive = related && related.studyIds.has(s.id);
+    const isDimmed = related && !related.studyIds.has(s.id);
+    if (isActive) {
+      el.style.background = c + '28';
+      el.style.borderColor = c;
+      el.style.color = c;
+      el.classList.add('active');
+    } else if (!related) {
+      el.style.borderColor = c + '50';
+      el.style.color = c + 'aa';
+    } else {
+      el.classList.add('dimmed');
+    }
+    el.onclick = () => toggle('study', s.id);
+    stRow.appendChild(el);
+  });
+
+  // TARGETS
+  const tRow = document.getElementById('target-row');
+  tRow.innerHTML = '';
+  TARGETS.forEach(t => {
+    const el = document.createElement('div');
+    el.className = 'chip target-chip';
+    el.textContent = t;
+    const c = TARGET_COLORS[t];
+    const isActive = related && related.targetIds.has(t);
+    const isDimmed = related && !related.targetIds.has(t);
+    if (isActive) {
+      el.style.background = c + '22';
+      el.style.borderColor = c;
+      el.style.color = c;
+      el.classList.add('active');
+    } else if (!related) {
+      el.style.borderColor = c + '55';
+      el.style.color = c + 'bb';
+    } else {
+      el.classList.add('dimmed');
+    }
+    el.onclick = () => toggle('target', t);
+    tRow.appendChild(el);
+  });
+
+  updateInfoPanel(selected?.type, selected?.id, related);
+
+  // Defer arrow drawing until DOM has updated
+  requestAnimationFrame(() => drawArrows(related));
+}
+
+function toggle(type, id) {
+  selected = (selected && selected.type === type && selected.id === id) ? null : { type, id };
+  render();
+}
+
+function resetAll() {
+  selected = null;
+  render();
+}
+
+function drawArrows(related) {
+  const svgTop = document.getElementById('svg-top');
+  const svgBot = document.getElementById('svg-bot');
+  svgTop.innerHTML = '';
+  svgBot.innerHTML = '';
+  if (!related) return;
+
+  const card = document.querySelector('.card');
+  const cardRect = card.getBoundingClientRect();
+
+  function relPos(el, svgEl) {
+    const svgRect = svgEl.parentElement.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    return {
+      x: r.left + r.width / 2 - cardRect.left,
+      y: r.top + r.height / 2 - svgRect.top,
+    };
+  }
+
+  function makeLine(svg, x1, y1, x2, y2, color) {
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+    line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+    line.setAttribute('stroke', color);
+    line.setAttribute('stroke-width', '1.5');
+    line.setAttribute('stroke-opacity', '0.65');
+    line.setAttribute('stroke-linecap', 'round');
+    svg.appendChild(line);
+  }
+
+  const sensorEls = {};
+  document.querySelectorAll('#sensor-row .chip').forEach(el => { sensorEls[el.textContent] = el; });
+  const studyEls = {};
+  document.querySelectorAll('#study-row .chip').forEach(el => {
+    const id = parseInt(el.textContent.replace(/[\[\]]/g, ''));
+    studyEls[id] = el;
+  });
+  const targetEls = {};
+  document.querySelectorAll('#target-row .chip').forEach(el => { targetEls[el.textContent] = el; });
+
+  related.studyIds.forEach(sId => {
+    const study = STUDIES.find(s => s.id === sId);
+    const studyEl = studyEls[sId];
+    if (!studyEl) return;
+    study.sensors.forEach(sen => {
+      if (!related.sensorIds.has(sen)) return;
+      const senEl = sensorEls[sen];
+      if (!senEl) return;
+      const from = relPos(senEl, svgTop);
+      const to = relPos(studyEl, svgTop);
+      makeLine(svgTop, from.x, from.y, to.x, to.y, SENSOR_COLORS[sen]);
+    });
+    study.targets.forEach(tgt => {
+      if (!related.targetIds.has(tgt)) return;
+      const tgtEl = targetEls[tgt];
+      if (!tgtEl) return;
+      const from = relPos(studyEl, svgBot);
+      const to = relPos(tgtEl, svgBot);
+      makeLine(svgBot, from.x, from.y, to.x, to.y, TARGET_COLORS[tgt]);
+    });
+  });
+}
+
+// Legend
+function buildLegend() {
+  const leg = document.getElementById('legend');
+  const all = { ...SENSOR_COLORS, ...TARGET_COLORS };
+  const labels = {
+    ...Object.fromEntries(Object.keys(SENSOR_COLORS).map(k => [k, SENSOR_FULL[k] || k])),
+    ...Object.fromEntries(Object.keys(TARGET_COLORS).map(k => [k, 'Target: ' + k])),
+  };
+  Object.entries(all).forEach(([name, color]) => {
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    item.innerHTML = `<span class="legend-dot" style="background:${color}"></span>${name}`;
+    leg.appendChild(item);
+  });
+}
+
+window.addEventListener('resize', () => {
+  if (selected) {
+    const related = getRelated(selected.type, selected.id);
+    requestAnimationFrame(() => drawArrows(related));
+  }
+});
+
+buildLegend();
+render();
+</script>
+</body>
+</html>
